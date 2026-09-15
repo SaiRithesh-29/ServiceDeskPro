@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const aiController_1 = require("../controllers/aiController");
+const auth_1 = require("../middleware/auth");
+const router = (0, express_1.Router)();
+router.use(auth_1.authenticate);
+router.post('/classify', aiController_1.AIController.classifyTicket);
+router.post('/suggest-kb', aiController_1.AIController.suggestKB);
+exports.default = router;
