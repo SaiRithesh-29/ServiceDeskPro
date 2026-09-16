@@ -10,6 +10,8 @@ const jwt_js_1 = require("../utils/jwt.js");
 const AppError_js_1 = require("../utils/AppError.js");
 const auditService_js_1 = require("./auditService.js");
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const crypto_1 = __importDefault(require("crypto"));
+const emailService_js_1 = require("../utils/emailService.js");
 class AuthService {
     static generateTokens(user) {
         const payload = {
@@ -35,6 +37,11 @@ class AuthService {
         }
         const salt = await bcryptjs_1.default.genSalt(10);
         const passwordHash = await bcryptjs_1.default.hash(data.password, salt);
+        
+        const verificationToken = crypto_1.default.randomBytes(32).toString('hex');
+        const emailVerificationToken = crypto_1.default.createHash('sha256').update(verificationToken).digest('hex');
+        const emailVerificationExpire = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+        
         const user = await User_js_1.User.create({
             name: data.name,
             email: data.email.toLowerCase(),
@@ -43,9 +50,14 @@ class AuthService {
             department: departmentId,
             phone: data.phone || '',
             isActive: true,
+            isEmailVerified: false,
+            emailVerificationToken,
+            emailVerificationExpire,
             lastLoginAt: new Date(),
         });
-        const tokens = this.generateTokens(user);
+        
+        await emailService_js_1.EmailService.sendVerificationEmail(user.email, verificationToken);
+        
         await auditService_js_1.AuditService.log({
             user,
             action: 'USER_REGISTERED',
@@ -53,7 +65,7 @@ class AuthService {
             entityId: user._id.toString(),
             entityDisplay: user.email,
         });
-        return tokens;
+        return { message: 'Registration successful. Please check your email to verify your account.' };
     }
     static async login(email, password) {
         const user = await User_js_1.User.findOne({ email: email.toLowerCase() })
@@ -69,9 +81,20 @@ class AuthService {
         if (!isMatch) {
             throw new AppError_js_1.AppError('Invalid email or password', 401);
         }
+        
+        if (!user.isEmailVerified) {
+            throw new AppError_js_1.AppError('Please verify your email address before logging in.', 403);
+        }
+        
         user.lastLoginAt = new Date();
-        await user.save({ validateBeforeSave: false });
         const tokens = this.generateTokens(user);
+        
+        // Save refresh token hash
+        user.refreshTokenHash = crypto_1.default.createHash('sha256').update(tokens.refreshToken).digest('hex');
+        user.refreshTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+        
+        await user.save({ validateBeforeSave: false });
+        
         await auditService_js_1.AuditService.log({
             user,
             action: 'USER_LOGIN',

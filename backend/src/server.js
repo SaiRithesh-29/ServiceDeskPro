@@ -14,6 +14,8 @@ const cors_1 = __importDefault(require("cors"));
 const helmet_1 = __importDefault(require("helmet"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const morgan_1 = __importDefault(require("morgan"));
+const express_mongo_sanitize_1 = __importDefault(require("express-mongo-sanitize"));
+const xss_clean_1 = __importDefault(require("xss-clean"));
 
 const db_1 = require("./config/db");
 const env_1 = require("./config/env");
@@ -81,6 +83,12 @@ app.use(
 
 // Cookie parser
 app.use((0, cookie_parser_1.default)());
+
+// Data sanitization against NoSQL query injection
+app.use((0, express_mongo_sanitize_1.default)());
+
+// Data sanitization against XSS
+app.use((0, xss_clean_1.default)());
 
 // Logging middleware
 app.use((0, morgan_1.default)("dev"));

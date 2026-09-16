@@ -13,18 +13,40 @@ class AuthController {
     static async register(req, res, next) {
         try {
             const result = await authService_js_1.AuthService.register(req.body);
-            res.cookie('refreshToken', result.refreshToken, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'lax',
-                maxAge: 7 * 24 * 60 * 60 * 1000,
-            });
             res.status(201).json({
                 success: true,
-                data: result,
+                message: result.message,
             });
         }
         catch (error) {
+            next(error);
+        }
+    }
+    
+    static async verifyEmail(req, res, next) {
+        try {
+            const { token } = req.params;
+            const hashedToken = require('crypto').createHash('sha256').update(token).digest('hex');
+            
+            const user = await User_js_1.User.findOne({
+                emailVerificationToken: hashedToken,
+                emailVerificationExpire: { $gt: Date.now() }
+            });
+            
+            if (!user) {
+                throw new AppError_js_1.AppError('Invalid or expired verification token', 400);
+            }
+            
+            user.isEmailVerified = true;
+            user.emailVerificationToken = undefined;
+            user.emailVerificationExpire = undefined;
+            await user.save();
+            
+            res.status(200).json({
+                success: true,
+                message: 'Email verified successfully. You can now log in.',
+            });
+        } catch (error) {
             next(error);
         }
     }
@@ -54,11 +76,22 @@ class AuthController {
                 throw new AppError_js_1.AppError('No refresh token provided', 401);
             }
             const payload = (0, jwt_js_1.verifyRefreshToken)(token);
-            const user = await User_js_1.User.findById(payload.id).populate('department team');
+            const user = await User_js_1.User.findById(payload.id).select('+refreshTokenHash').populate('department team');
             if (!user || !user.isActive) {
                 throw new AppError_js_1.AppError('Invalid token or deactivated user', 401);
             }
+            
+            const hashedToken = require('crypto').createHash('sha256').update(token).digest('hex');
+            if (user.refreshTokenHash !== hashedToken) {
+                throw new AppError_js_1.AppError('Refresh token is invalid or has been revoked', 401);
+            }
+            
             const tokens = authService_js_1.AuthService.generateTokens(user);
+            
+            user.refreshTokenHash = require('crypto').createHash('sha256').update(tokens.refreshToken).digest('hex');
+            user.refreshTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+            await user.save({ validateBeforeSave: false });
+            
             res.status(200).json({
                 success: true,
                 data: tokens,
@@ -68,8 +101,17 @@ class AuthController {
             next(error);
         }
     }
-    static async logout(_req, res, next) {
+    static async logout(req, res, next) {
         try {
+            if (req.user && req.user._id) {
+                const user = await User_js_1.User.findById(req.user._id);
+                if (user) {
+                    user.refreshTokenHash = undefined;
+                    user.refreshTokenExpiresAt = undefined;
+                    await user.save({ validateBeforeSave: false });
+                }
+            }
+            
             res.clearCookie('refreshToken');
             res.clearCookie('accessToken');
             res.status(200).json({
@@ -150,8 +192,10 @@ class AuthController {
             user.resetPasswordToken = hashedToken;
             user.resetPasswordExpire = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
             await user.save();
-            // TODO: Send email with reset link
-            // const resetLink = `${env.CLIENT_URL}/reset-password/${resetToken}`;
+            // Send email with reset link
+            const emailService_js_1 = require("../utils/emailService.js");
+            await emailService_js_1.EmailService.sendPasswordResetEmail(user.email, resetToken);
+            
             res.status(200).json({
                 success: true,
                 message: 'Password reset email sent. Check your inbox for the reset link.',

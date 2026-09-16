@@ -8,6 +8,7 @@ const authValidator_1 = require("../validators/authValidator");
 const router = (0, express_1.Router)();
 // Public routes
 router.post('/register', (0, validate_1.validate)(authValidator_1.registerSchema), authController_1.AuthController.register);
+router.get('/verify-email/:token', authController_1.AuthController.verifyEmail);
 router.post('/login', (0, validate_1.validate)(authValidator_1.loginSchema), authController_1.AuthController.login);
 // Protected routes
 router.post('/refresh', authController_1.AuthController.refresh);
