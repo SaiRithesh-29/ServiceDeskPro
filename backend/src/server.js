@@ -60,7 +60,11 @@ app.use(
 // CORS
 app.use(
     (0, cors_1.default)({
-        origin: env_1.env.CLIENT_URL || "http://localhost:5173",
+        origin: [
+            env.CLIENT_URL,
+            "https://service-desk-pro-azure.vercel.app",
+            "https://service-desk-nsg1ae2vi-somishetty-sai-rithesh-s-projects.vercel.app"
+        ],
         credentials: true,
         optionsSuccessStatus: 200,
     })
