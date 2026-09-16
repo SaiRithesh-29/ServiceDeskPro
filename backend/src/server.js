@@ -147,3 +147,5 @@ async function startServer() {
     }
 }
 exports.default = app;
+
+startServer();
