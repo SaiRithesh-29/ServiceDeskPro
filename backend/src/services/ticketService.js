@@ -18,7 +18,9 @@ class TicketService {
      * Generates the next sequential ticket ID (e.g. SDP-1001).
      */
     static async getNextTicketId() {
-        const latest = await Ticket_js_1.Ticket.findOne({}, { ticketId: 1 }).sort({ createdAt: -1 });
+        const latest = await Ticket_js_1.Ticket.findOne({}, { ticketId: 1 })
+            .sort({ ticketId: -1 })
+            .collation({ locale: "en", numericOrdering: true });
         if (!latest || !latest.ticketId) {
             return 'SDP-1001';
         }
