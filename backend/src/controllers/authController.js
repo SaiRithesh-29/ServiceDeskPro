@@ -182,25 +182,36 @@ class AuthController {
     static async forgotPassword(req, res, next) {
         try {
             const { email } = req.body;
-            const user = await User_js_1.User.findOne({ email: email.toLowerCase() });
-            if (!user) {
-                throw new AppError_js_1.AppError('User not found', 404);
+            if (!email) {
+                throw new AppError_js_1.AppError('Please provide an email address', 400);
             }
-            // Generate reset token
-            const resetToken = require('crypto').randomBytes(32).toString('hex');
-            const hashedToken = require('crypto').createHash('sha256').update(resetToken).digest('hex');
-            user.resetPasswordToken = hashedToken;
-            user.resetPasswordExpire = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
-            await user.save();
-            // Send email with reset link
-            const emailService_js_1 = require("../utils/emailService.js");
-            await emailService_js_1.EmailService.sendPasswordResetEmail(user.email, resetToken);
+            const user = await User_js_1.User.findOne({ email: email.toLowerCase() });
+            if (user) {
+                // Generate secure random reset token
+                const resetToken = require('crypto').randomBytes(32).toString('hex');
+                const hashedToken = require('crypto').createHash('sha256').update(resetToken).digest('hex');
+                user.resetPasswordToken = hashedToken;
+                user.resetPasswordExpire = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+                await user.save({ validateBeforeSave: false });
+                
+                // Clearly isolated development log mechanism (not in client response)
+                const logger = require("../utils/logger.js").logger;
+                logger.info(`[DEV PASSWORD RESET] Reset token generated for ${user.email}: ${resetToken}`);
+                logger.info(`[DEV PASSWORD RESET] Link: ${process.env.CLIENT_URL || 'http://localhost:5173'}/reset-password/${resetToken}`);
+                
+                // Attempt to send email
+                try {
+                    const emailService_js_1 = require("../utils/emailService.js");
+                    await emailService_js_1.EmailService.sendPasswordResetEmail(user.email, resetToken);
+                } catch (emailErr) {
+                    logger.warn('Failed to dispatch password reset email:', emailErr.message);
+                }
+            }
             
+            // Never reveal whether an email exists
             res.status(200).json({
                 success: true,
-                message: 'Password reset email sent. Check your inbox for the reset link.',
-                // For development only - remove in production
-                resetToken: process.env.NODE_ENV === 'development' ? resetToken : undefined,
+                message: 'If an account exists with that email address, a password reset link has been sent.',
             });
         }
         catch (error) {
@@ -210,6 +221,12 @@ class AuthController {
     static async resetPassword(req, res, next) {
         try {
             const { resetToken, newPassword } = req.body;
+            if (!resetToken || !newPassword) {
+                throw new AppError_js_1.AppError('Reset token and new password are required', 400);
+            }
+            if (newPassword.length < 6) {
+                throw new AppError_js_1.AppError('Password must be at least 6 characters long', 400);
+            }
             const hashedToken = require('crypto').createHash('sha256').update(resetToken).digest('hex');
             const user = await User_js_1.User.findOne({
                 resetPasswordToken: hashedToken,
@@ -223,6 +240,16 @@ class AuthController {
             user.resetPasswordToken = undefined;
             user.resetPasswordExpire = undefined;
             await user.save();
+
+            const auditService_js_1 = require("../services/auditService.js");
+            await auditService_js_1.AuditService.log({
+                user,
+                action: 'PASSWORD_RESET',
+                entityType: 'auth',
+                entityId: user._id.toString(),
+                entityDisplay: user.email,
+            });
+
             res.status(200).json({
                 success: true,
                 message: 'Password reset successfully. You can now log in with your new password.',

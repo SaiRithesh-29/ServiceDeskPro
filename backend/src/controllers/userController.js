@@ -55,6 +55,10 @@ class UserController {
     static async createUser(req, res, next) {
         try {
             const { name, email, password, role, department, team, phone } = req.body;
+            // Verify permission to create privileged user
+            if (!['system_admin', 'admin'].includes(req.user?.role)) {
+                throw new AppError_js_1.AppError('You are not authorized to create users', 403);
+            }
             const existing = await User_js_1.User.findOne({ email: email.toLowerCase() });
             if (existing)
                 throw new AppError_js_1.AppError('Email already in use', 400);
@@ -64,12 +68,25 @@ class UserController {
                 name,
                 email: email.toLowerCase(),
                 passwordHash,
-                role,
+                role: role || 'employee',
                 department: department || undefined,
                 team: team || undefined,
                 phone: phone || '',
                 isActive: true,
+                isEmailVerified: true,
+                lastLoginAt: undefined,
             });
+
+            const auditService_js_1 = require("../services/auditService.js");
+            await auditService_js_1.AuditService.log({
+                req,
+                user: req.user,
+                action: 'USER_CREATED',
+                entityType: 'user',
+                entityId: user._id.toString(),
+                entityDisplay: `${user.name} (${user.email}) - ${user.role}`,
+            });
+
             res.status(201).json({
                 success: true,
                 data: user,
@@ -105,12 +122,65 @@ class UserController {
     static async updateUser(req, res, next) {
         try {
             const { id } = req.params;
+            // Prevent unauthorized role/status elevation
+            if (req.body.role && !['system_admin', 'admin'].includes(req.user?.role)) {
+                throw new AppError_js_1.AppError('You are not authorized to assign roles', 403);
+            }
+            if (req.body.isActive !== undefined && !['system_admin', 'admin'].includes(req.user?.role)) {
+                throw new AppError_js_1.AppError('You are not authorized to change account status', 403);
+            }
             const user = await User_js_1.User.findByIdAndUpdate(id, req.body, {
                 new: true,
                 runValidators: true,
             }).populate('department team');
             if (!user)
                 throw new AppError_js_1.AppError('User not found', 404);
+
+            const auditService_js_1 = require("../services/auditService.js");
+            await auditService_js_1.AuditService.log({
+                req,
+                user: req.user,
+                action: 'USER_UPDATED',
+                entityType: 'user',
+                entityId: user._id.toString(),
+                entityDisplay: user.email,
+                changes: req.body,
+            });
+
+            res.status(200).json({
+                success: true,
+                data: user,
+            });
+        }
+        catch (error) {
+            next(error);
+        }
+    }
+    static async updateRole(req, res, next) {
+        try {
+            const { id } = req.params;
+            const { role } = req.body;
+            if (!['system_admin', 'admin'].includes(req.user?.role)) {
+                throw new AppError_js_1.AppError('You are not authorized to assign roles', 403);
+            }
+            const user = await User_js_1.User.findById(id);
+            if (!user)
+                throw new AppError_js_1.AppError('User not found', 404);
+            const prevRole = user.role;
+            user.role = role;
+            await user.save();
+
+            const auditService_js_1 = require("../services/auditService.js");
+            await auditService_js_1.AuditService.log({
+                req,
+                user: req.user,
+                action: 'USER_ROLE_CHANGED',
+                entityType: 'user',
+                entityId: user._id.toString(),
+                entityDisplay: `${user.email} (${prevRole} -> ${role})`,
+                changes: { previous: prevRole, current: role },
+            });
+
             res.status(200).json({
                 success: true,
                 data: user,
@@ -123,14 +193,59 @@ class UserController {
     static async toggleStatus(req, res, next) {
         try {
             const { id } = req.params;
+            if (!['system_admin', 'admin'].includes(req.user?.role)) {
+                throw new AppError_js_1.AppError('You are not authorized to change account status', 403);
+            }
             const user = await User_js_1.User.findById(id);
             if (!user)
                 throw new AppError_js_1.AppError('User not found', 404);
             user.isActive = !user.isActive;
             await user.save();
+
+            const auditService_js_1 = require("../services/auditService.js");
+            await auditService_js_1.AuditService.log({
+                req,
+                user: req.user,
+                action: 'USER_STATUS_TOGGLED',
+                entityType: 'user',
+                entityId: user._id.toString(),
+                entityDisplay: `${user.email} isActive=${user.isActive}`,
+            });
+
             res.status(200).json({
                 success: true,
                 data: user,
+            });
+        }
+        catch (error) {
+            next(error);
+        }
+    }
+    static async deleteUser(req, res, next) {
+        try {
+            const { id } = req.params;
+            if (!['system_admin', 'admin'].includes(req.user?.role)) {
+                throw new AppError_js_1.AppError('You are not authorized to delete users', 403);
+            }
+            const user = await User_js_1.User.findById(id);
+            if (!user)
+                throw new AppError_js_1.AppError('User not found', 404);
+            user.isActive = false;
+            await user.save();
+
+            const auditService_js_1 = require("../services/auditService.js");
+            await auditService_js_1.AuditService.log({
+                req,
+                user: req.user,
+                action: 'USER_DEACTIVATED',
+                entityType: 'user',
+                entityId: user._id.toString(),
+                entityDisplay: user.email,
+            });
+
+            res.status(200).json({
+                success: true,
+                message: `User ${user.email} deactivated successfully`,
             });
         }
         catch (error) {

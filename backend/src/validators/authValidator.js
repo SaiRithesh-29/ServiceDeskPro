@@ -7,10 +7,19 @@ exports.registerSchema = zod_1.z.object({
         name: zod_1.z.string().min(2, 'Name must be at least 2 characters').max(100),
         email: zod_1.z.string().email('Please provide a valid email address'),
         password: zod_1.z.string().min(6, 'Password must be at least 6 characters'),
-        role: zod_1.z
-            .enum(['admin', 'it_manager', 'technician', 'employee', 'asset_manager'])
-            .optional(),
-        departmentCode: zod_1.z.string().optional(),
+        departmentName: zod_1.z.string().min(2, 'Department must be at least 2 characters').max(100),
+        jobFunction: zod_1.z.string().min(2, 'Job function must be at least 2 characters').max(100),
+        jobLevel: zod_1.z.enum([
+            'entry_level',
+            'individual_contributor',
+            'senior_lead',
+            'manager',
+            'senior_manager',
+            'director',
+            'senior_director',
+            'vp_svp',
+            'c_level',
+        ], { required_error: 'Job level is required' }),
         phone: zod_1.z.string().optional(),
     }),
 });

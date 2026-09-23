@@ -10,6 +10,7 @@
     "build": "npm run build --workspace=frontend",
     "start": "npm start --workspace=backend",
     "seed": "npm run seed --workspace=backend",
+    "bootstrap:admin": "npm run bootstrap:admin --workspace=backend",
     "test": "npm run test --workspace=backend"
   },
   "workspaces": [

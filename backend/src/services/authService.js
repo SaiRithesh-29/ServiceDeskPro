@@ -29,12 +29,6 @@ class AuthService {
         if (existing) {
             throw new AppError_js_1.AppError('An account with this email already exists', 400);
         }
-        let departmentId = undefined;
-        if (data.departmentCode) {
-            const dept = await Department_js_1.Department.findOne({ code: data.departmentCode.toUpperCase() });
-            if (dept)
-                departmentId = dept._id;
-        }
         const salt = await bcryptjs_1.default.genSalt(10);
         const passwordHash = await bcryptjs_1.default.hash(data.password, salt);
         
@@ -47,16 +41,14 @@ class AuthService {
             email: data.email.toLowerCase(),
             passwordHash,
             role: 'employee',
-            department: departmentId,
+            departmentName: data.departmentName || '',
+            jobFunction: data.jobFunction || '',
+            jobLevel: data.jobLevel || '',
             phone: data.phone || '',
             isActive: true,
-            isEmailVerified: false,
-            emailVerificationToken,
-            emailVerificationExpire,
+            isEmailVerified: true,
             lastLoginAt: new Date(),
         });
-        
-        await emailService_js_1.EmailService.sendVerificationEmail(user.email, verificationToken);
         
         await auditService_js_1.AuditService.log({
             user,
@@ -65,7 +57,15 @@ class AuthService {
             entityId: user._id.toString(),
             entityDisplay: user.email,
         });
-        return { message: 'Registration successful. Please check your email to verify your account.' };
+        return {
+            message: 'Registration successful. You can now log in.',
+            user: {
+                id: user._id.toString(),
+                name: user.name,
+                email: user.email,
+                role: user.role,
+            },
+        };
     }
     static async login(email, password) {
         const user = await User_js_1.User.findOne({ email: email.toLowerCase() })
@@ -75,14 +75,14 @@ class AuthService {
             throw new AppError_js_1.AppError('Invalid email or password', 401);
         }
         if (!user.isActive) {
-            throw new AppError_js_1.AppError('This account has been deactivated. Contact an administrator.', 403);
+            throw new AppError_js_1.AppError('Your account is inactive. Please contact your administrator.', 403);
         }
         const isMatch = await user.comparePassword(password);
         if (!isMatch) {
             throw new AppError_js_1.AppError('Invalid email or password', 401);
         }
         
-        if (!user.isEmailVerified) {
+        if (process.env.REQUIRE_EMAIL_VERIFICATION === 'true' && !user.isEmailVerified) {
             throw new AppError_js_1.AppError('Please verify your email address before logging in.', 403);
         }
         

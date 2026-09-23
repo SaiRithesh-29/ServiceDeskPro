@@ -62,7 +62,7 @@ const UserSchema = new mongoose_1.Schema({
     },
     role: {
         type: String,
-        enum: ['admin', 'it_manager', 'technician', 'employee', 'asset_manager'],
+        enum: ['system_admin', 'admin', 'it_manager', 'technician', 'employee', 'asset_manager'],
         default: 'employee',
         index: true,
     },
@@ -70,6 +70,23 @@ const UserSchema = new mongoose_1.Schema({
         type: mongoose_1.Schema.Types.ObjectId,
         ref: 'Department',
         index: true,
+    },
+    departmentName: {
+        type: String,
+        trim: true,
+        maxlength: [100, 'Department name cannot exceed 100 characters'],
+        default: '',
+    },
+    jobFunction: {
+        type: String,
+        trim: true,
+        maxlength: [100, 'Job function cannot exceed 100 characters'],
+        default: '',
+    },
+    jobLevel: {
+        type: String,
+        enum: ['entry_level', 'individual_contributor', 'senior_lead', 'manager', 'senior_manager', 'director', 'senior_director', 'vp_svp', 'c_level', ''],
+        default: '',
     },
     team: {
         type: mongoose_1.Schema.Types.ObjectId,

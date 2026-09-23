@@ -17,9 +17,18 @@ class TicketController {
         try {
             const { status, priority, category, department, technician, requester, slaStatus, search, startDate, endDate, page = '1', limit = '15', sortBy = 'createdAt', sortOrder = 'desc', } = req.query;
             const filter = {};
-            // Role scoping: Employees only see their submitted tickets
+            // Role scoping
             if (req.user?.role === 'employee') {
                 filter.requester = req.user._id;
+            } else if (req.user?.role === 'technician') {
+                if (req.user.team) {
+                    filter.$or = [
+                        { assignedTechnician: req.user._id },
+                        { assignedTeam: req.user.team._id || req.user.team },
+                    ];
+                } else {
+                    filter.assignedTechnician = req.user._id;
+                }
             }
             if (status) {
                 if (Array.isArray(status))
@@ -35,7 +44,7 @@ class TicketController {
                 filter.category = category;
             if (department)
                 filter.department = department;
-            if (technician)
+            if (technician && req.user?.role !== 'technician')
                 filter.assignedTechnician = technician;
             if (requester && req.user?.role !== 'employee')
                 filter.requester = requester;
@@ -111,6 +120,17 @@ class TicketController {
                 ticket.requester._id.toString() !== req.user._id.toString()) {
                 throw new AppError_js_1.AppError('You do not have permission to view this ticket', 403);
             }
+            // Check access permission for technician
+            if (req.user?.role === 'technician') {
+                const myId = req.user._id.toString();
+                const isAssignedToMe = ticket.assignedTechnician && (ticket.assignedTechnician._id || ticket.assignedTechnician).toString() === myId;
+                const myTeamId = req.user.team ? (req.user.team._id || req.user.team).toString() : null;
+                const ticketTeamId = ticket.assignedTeam ? (ticket.assignedTeam._id || ticket.assignedTeam).toString() : null;
+                const isAssignedToMyTeam = myTeamId && ticketTeamId && myTeamId === ticketTeamId;
+                if (!isAssignedToMe && !isAssignedToMyTeam) {
+                    throw new AppError_js_1.AppError('You do not have permission to view this ticket', 403);
+                }
+            }
             // Dynamic SLA evaluation for real-time countdown
             const slaEvaluation = slaEngine_js_1.SLAEngine.evaluateTicketSLA(ticket);
             // Comments filter (Employees NEVER see internal notes)
@@ -156,6 +176,13 @@ class TicketController {
             // Employees cannot edit fields other than basic descriptions on open tickets
             if (req.user?.role === 'employee' && ticket.requester.toString() !== req.user._id.toString()) {
                 throw new AppError_js_1.AppError('Unauthorized to modify this ticket', 403);
+            }
+            // Technicians can only modify tickets assigned to them
+            if (req.user?.role === 'technician') {
+                const isAssigned = ticket.assignedTechnician && ticket.assignedTechnician.toString() === req.user._id.toString();
+                if (!isAssigned) {
+                    throw new AppError_js_1.AppError('Technicians can only modify tickets assigned to them', 403);
+                }
             }
             Object.assign(ticket, req.body);
             await ticket.save();

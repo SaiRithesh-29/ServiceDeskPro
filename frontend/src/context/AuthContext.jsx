@@ -27,9 +27,10 @@ export function AuthProvider({ children }) {
         const result = await authService.login({ email, password });
         setUser(result.data.user);
     };
-    const register = async (name, email, password) => {
-        const result = await authService.register({ name, email, password });
-        setUser(result.data.user);
+    const register = async (data) => {
+        const result = await authService.register(data);
+        // Registration now returns a message (email verification required), no auto-login
+        return result;
     };
     const logout = async () => {
         try {

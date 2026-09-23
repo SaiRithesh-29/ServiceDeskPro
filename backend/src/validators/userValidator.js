@@ -7,7 +7,7 @@ exports.createUserSchema = zod_1.z.object({
         name: zod_1.z.string().min(2, 'Name is required'),
         email: zod_1.z.string().email('Valid email is required'),
         password: zod_1.z.string().min(6, 'Password must be at least 6 characters'),
-        role: zod_1.z.enum(['admin', 'it_manager', 'technician', 'employee', 'asset_manager']),
+        role: zod_1.z.enum(['system_admin', 'admin', 'it_manager', 'technician', 'employee', 'asset_manager']),
         department: zod_1.z.string().optional(),
         team: zod_1.z.string().optional(),
         phone: zod_1.z.string().optional(),
@@ -17,7 +17,7 @@ exports.createUserSchema = zod_1.z.object({
 exports.updateUserSchema = zod_1.z.object({
     body: zod_1.z.object({
         name: zod_1.z.string().min(2).optional(),
-        role: zod_1.z.enum(['admin', 'it_manager', 'technician', 'employee', 'asset_manager']).optional(),
+        role: zod_1.z.enum(['system_admin', 'admin', 'it_manager', 'technician', 'employee', 'asset_manager']).optional(),
         department: zod_1.z.string().nullable().optional(),
         team: zod_1.z.string().nullable().optional(),
         phone: zod_1.z.string().optional(),
@@ -40,7 +40,7 @@ exports.userValidator = {
     createUser: exports.createUserSchema,
     updateUser: exports.updateUserSchema,
     updateStatus: zod_1.z.object({ body: zod_1.z.object({ isActive: zod_1.z.boolean().optional() }) }),
-    updateRole: zod_1.z.object({ body: zod_1.z.object({ role: zod_1.z.enum(['admin', 'it_manager', 'technician', 'employee', 'asset_manager']) }) }),
+    updateRole: zod_1.z.object({ body: zod_1.z.object({ role: zod_1.z.enum(['system_admin', 'admin', 'it_manager', 'technician', 'employee', 'asset_manager']) }) }),
     bulkDeactivate: zod_1.z.object({ body: zod_1.z.object({ userIds: zod_1.z.array(zod_1.z.string()).min(1) }) }),
     bulkAssignTeam: zod_1.z.object({ body: zod_1.z.object({ userIds: zod_1.z.array(zod_1.z.string()).min(1), teamId: zod_1.z.string() }) }),
     createSLA: exports.createSLAPolicySchema,
