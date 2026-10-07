@@ -250,24 +250,25 @@ body {
 .ops-input {
   width: 100%;
   padding: 10px 14px;
-  background: rgba(7, 9, 26, 0.8);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(10, 12, 30, 0.85); /* slightly lighter dark background */
+  border: 1px solid rgba(255,255,255,0.2);
   border-radius: 8px;
-  color: #e2e8f0;
+  color: #ffffff; /* brighter text */
   font-size: 14px;
   font-family: 'Inter', sans-serif;
   outline: none;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
+  box-shadow: inset 0 0 4px rgba(0,0,0,0.3);
 }
-.ops-input::placeholder { color: #3b5999; }
+.ops-input::placeholder { color: #a0aec0; /* lighter placeholder */ }
 .ops-input:focus {
-  border-color: rgba(0, 200, 255, 0.5);
-  box-shadow: 0 0 0 3px rgba(0, 200, 255, 0.08), 0 0 12px rgba(0, 200, 255, 0.15);
-  background: rgba(7, 9, 26, 0.95);
+  border-color: rgba(0, 180, 255, 0.7);
+  box-shadow: 0 0 0 4px rgba(0, 180, 255, 0.12), 0 0 12px rgba(0, 180, 255, 0.2);
+  background: rgba(10, 12, 30, 0.9);
 }
 .ops-input.error {
-  border-color: rgba(255, 59, 92, 0.5);
-  box-shadow: 0 0 0 3px rgba(255, 59, 92, 0.08);
+  border-color: rgba(255, 85, 115, 0.7);
+  box-shadow: 0 0 0 4px rgba(255, 85, 115, 0.12);
 }
 
 .ops-label {
